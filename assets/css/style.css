@@ -87,6 +87,19 @@ h4 {
     width: 100%;
 }
 
+/* ─── TOPBAR ─── */
+.hamburger, .theme-toggle {
+    background: none;
+    border: none;
+    color: var(--text-main);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.5rem;
+    transition: color 0.3s;
+}
+
 /* ─── TOP NAVBAR ─── */
 .topnav {
     height: 70px;

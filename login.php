@@ -21,8 +21,22 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     
     if ($action === 'forgot') {
         $username = trim($_POST['username']);
-        // Simulating a reset request
-        $success = "If an account exists for $username, a reset link has been sent (Simulated).";
+        
+        // Generate real reset token
+        $stmt = $pdo->prepare("SELECT id FROM users WHERE username = ?");
+        $stmt->execute([$username]);
+        $user_data = $stmt->fetch();
+        
+        if ($user_data) {
+            $token = bin2hex(random_bytes(32));
+            $stmt = $pdo->prepare("UPDATE users SET reset_token = ?, reset_expiry = DATE_ADD(NOW(), INTERVAL 1 HOUR) WHERE id = ?");
+            $stmt->execute([$token, $user_data['id']]);
+            
+            $reset_link = "reset_password.php?token=" . $token;
+            $success = "A reset link has been generated. <a href='$reset_link' style='color:var(--primary); font-weight:700;'>Click here to reset your password</a> (Simulation).";
+        } else {
+            $success = "If an account exists for $username, a reset link has been sent.";
+        }
         $mode = 'login';
     } elseif ($action === 'signup') {
         $username = trim($_POST['username']);
@@ -170,7 +184,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     <h2 class="auth-title">Sign in</h2>
                     <p class="auth-subtitle">Welcome back! Please enter your details.</p>
                     <?php if ($error): ?><div class="alert alert-error"><span><?php echo e($error); ?></span></div><?php endif; ?>
-                    <?php if ($success): ?><div class="alert alert-success"><span><?php echo e($success); ?></span></div><?php endif; ?>
+                    <?php if ($success): ?><div class="alert alert-success"><span><?php echo $success; ?></span></div><?php endif; ?>
                     <form method="POST">
                         <input type="hidden" name="action" value="login">
                         <input type="hidden" name="csrf_token" value="<?php echo get_csrf_token(); ?>">
