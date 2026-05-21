@@ -183,9 +183,7 @@ if ($user_role !== 'admin'): ?>
                                     <p style="font-size: 0.8125rem; color: var(--text-muted); margin-bottom: 1rem; line-height: 1.4;">
                                         This will permanently remove your profile and all selection history. This action is irreversible.
                                     </p>
-                                    <a href="users.php?delete=<?php
-$base_path = '';
-echo $_SESSION['user_id']; ?>" 
+                                    <a href="users/users.php?delete=<?php echo $_SESSION['user_id']; ?>&csrf=<?php echo $_SESSION['csrf_token']; ?>" 
                                        class="btn btn-danger" 
                                        style="background: var(--danger); color: white; padding: 0.6rem 1.25rem; font-size: 0.8125rem; font-weight: 600;"
                                        onclick="return confirm('PERMANENT DELETION: Are you absolutely sure?')">

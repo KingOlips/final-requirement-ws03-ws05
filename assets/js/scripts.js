@@ -228,7 +228,27 @@ function showConfirm(title, message, onConfirm) {
 document.addEventListener('DOMContentLoaded', () => {
     initTheme();
     initPageTransitions();
+    initDashboardHistoryLock();
 });
+
+// Prevent going back to the login page from the dashboard and force logout
+function getLogoutUrl() {
+    const path = window.location.pathname;
+    if (path.includes('/product/') || path.includes('/users/') || path.includes('/actions/')) {
+        return '../logout.php';
+    }
+    return 'logout.php';
+}
+
+function initDashboardHistoryLock() {
+    const path = window.location.pathname;
+    if (path.endsWith('index.php') || path === '/' || path.endsWith('/final-requirement-ws03-ws05/') || path.endsWith('/final-requirement-ws03-ws05')) {
+        window.history.pushState(null, null, window.location.href);
+        window.addEventListener('popstate', function () {
+            window.location.replace(getLogoutUrl());
+        });
+    }
+}
 
 // Page Transition Logic
 function initPageTransitions() {
@@ -271,3 +291,10 @@ function initPageTransitions() {
         }
     });
 }
+
+// Force reload when navigated via browser back/forward cache (bfcache)
+window.addEventListener('pageshow', function (event) {
+    if (event.persisted || (window.performance && window.performance.navigation.type === 2)) {
+        window.location.reload();
+    }
+});

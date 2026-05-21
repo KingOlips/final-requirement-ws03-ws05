@@ -4,31 +4,42 @@ require_once '../auth/auth_check.php';
 require_once '../includes/db_connection.php';
 require_login();
 
-// Restrict to admins only
+// Handle deletion
+if (isset($_GET['delete'])) {
+    if (!isset($_GET['csrf']) || !verify_csrf_token($_GET['csrf'])) {
+        die("Security violation: CSRF token mismatch.");
+    }
+    
+    $delete_id = (int)$_GET['delete'];
+    
+    if ($delete_id === $_SESSION['user_id']) {
+        // Self-deletion logic
+        $stmt = $pdo->prepare("DELETE FROM users WHERE id = ?");
+        $stmt->execute([$delete_id]);
+        header("Location: ../logout.php");
+        exit();
+    } else {
+        // Admin deleting another user - restrict to admin
+        if (($_SESSION['role'] ?? 'user') !== 'admin') {
+            header("Location: ../index.php");
+            exit();
+        }
+        $stmt = $pdo->prepare("DELETE FROM users WHERE id = ?");
+        $stmt->execute([$delete_id]);
+        $_SESSION['success_msg'] = "User deleted successfully.";
+        header("Location: users.php");
+        exit();
+    }
+}
+
+// Restrict access to other users to admins only
 if (($_SESSION['role'] ?? 'user') !== 'admin') {
-    header("Location: index.php");
+    header("Location: ../index.php");
     exit();
 }
 
 $success = '';
 $error = '';
-
-// Handle deletion
-if (isset($_GET['delete'])) {
-    $delete_id = (int)$_GET['delete'];
-    if ($delete_id !== $_SESSION['user_id']) { 
-        $stmt = $pdo->prepare("DELETE FROM users WHERE id = ?");
-        $stmt->execute([$delete_id]);
-        $_SESSION['success_msg'] = "User deleted successfully.";
-        header("Location: users.php");
-    } else {
-        // Self-deletion logic
-        $stmt = $pdo->prepare("DELETE FROM users WHERE id = ?");
-        $stmt->execute([$delete_id]);
-        header("Location: logout.php");
-    }
-    exit();
-}
 
 // Fetch all users
 $stmt = $pdo->query("SELECT id, username, role, created_at FROM users ORDER BY created_at DESC");
@@ -102,7 +113,7 @@ $users = $stmt->fetchAll();
                                         </td>
                                         <td>
                                             <?php if ($user['id'] !== $_SESSION['user_id']): ?>
-                                                <a href="?delete=<?php echo $user['id']; ?>" class="btn btn-danger" style="padding: 0.4rem 0.8rem; font-size: 0.75rem; background: rgba(239, 68, 68, 0.1); color: var(--danger);" onclick="event.preventDefault(); showConfirm('Delete User?', 'Are you sure you want to remove this user account?', () => window.location.href = this.href);">Delete</a>
+                                                <a href="?delete=<?php echo $user['id']; ?>&csrf=<?php echo $_SESSION['csrf_token']; ?>" class="btn btn-danger" style="padding: 0.4rem 0.8rem; font-size: 0.75rem; background: rgba(239, 68, 68, 0.1); color: var(--danger);" onclick="event.preventDefault(); showConfirm('Delete User?', 'Are you sure you want to remove this user account?', () => window.location.href = this.href);">Delete</a>
                                             <?php else: ?>
                                                 <span style="font-size: 0.75rem; color: var(--text-muted); font-style: italic;">Current User</span>
                                             <?php endif; ?>

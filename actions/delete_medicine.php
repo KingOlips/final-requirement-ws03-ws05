@@ -10,6 +10,9 @@ if (($_SESSION['role'] ?? 'user') !== 'admin') {
 }
 
 if (isset($_GET['id'])) {
+    if (!isset($_GET['csrf']) || !verify_csrf_token($_GET['csrf'])) {
+        die("Security violation: CSRF token mismatch.");
+    }
     $id = (int)$_GET['id'];
     
     try {

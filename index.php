@@ -226,7 +226,7 @@ $total_value   = $pdo->query("SELECT SUM(quantity * price_per_unit) FROM batches
     <script src="assets/js/scripts.js"></script>
     <script>
         <?php if (isset($_SESSION['undo_msg'])): ?>
-            showUndoToast('<?php echo addslashes($_SESSION['undo_msg']); ?>', 'actions/undo_delete.php');
+            showUndoToast('<?php echo addslashes($_SESSION['undo_msg']); ?>', 'actions/undo_delete.php?csrf=<?php echo $_SESSION['csrf_token']; ?>');
             <?php unset($_SESSION['undo_msg']); ?>
         <?php endif; ?>
 

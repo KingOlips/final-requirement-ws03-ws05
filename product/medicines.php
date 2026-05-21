@@ -150,7 +150,7 @@ $medicines = $stmt->fetchAll();
                                         <td><span class="badge <?php echo $badge; ?>"><?php echo $status; ?></span></td>
                                         <td>
                                             <?php if (($_SESSION['role'] ?? 'user') === 'admin'): ?>
-                                                <a href="../actions/delete_medicine.php?id=<?php echo $med['id']; ?>" class="btn btn-danger" style="padding: 0.4rem 0.8rem; font-size: 0.75rem; background: rgba(239, 68, 68, 0.1); color: var(--danger);" onclick="event.preventDefault(); showConfirm('Delete Medicine?', 'Are you sure you want to remove this medicine and all its associated batches?', () => window.location.href = this.href);">Delete</a>
+                                                <a href="../actions/delete_medicine.php?id=<?php echo $med['id']; ?>&csrf=<?php echo $_SESSION['csrf_token']; ?>" class="btn btn-danger" style="padding: 0.4rem 0.8rem; font-size: 0.75rem; background: rgba(239, 68, 68, 0.1); color: var(--danger);" onclick="event.preventDefault(); showConfirm('Delete Medicine?', 'Are you sure you want to remove this medicine and all its associated batches?', () => window.location.href = this.href);">Delete</a>
                                             <?php else: ?>
                                                 <button onclick="addToCart(<?php echo $med['id']; ?>, '<?php echo addslashes($med['name']); ?>')" class="btn btn-primary" style="padding: 0.4rem 0.8rem; font-size: 0.75rem;" <?php echo $med['total_qty'] <= 0 ? 'disabled' : ''; ?>>
                                                     Add to Cart
@@ -160,7 +160,7 @@ $medicines = $stmt->fetchAll();
                                     </tr>
                                 <?php endforeach; ?>
                                 <?php if (empty($medicines)): ?>
-                                    <tr><td colspan="6" style="text-align: center; padding: 4rem; color: var(--text-muted);">
+                                    <tr><td colspan="7" style="text-align: center; padding: 4rem; color: var(--text-muted);">
                                         <svg width="48" height="48" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="opacity: 0.2; margin-bottom: 1rem;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
                                         <p>No medicines found matching your criteria.</p>
                                     </td></tr>

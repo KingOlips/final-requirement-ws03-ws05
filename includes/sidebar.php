@@ -2,6 +2,12 @@
 $current_page = basename($_SERVER['PHP_SELF']);
 $user_initial = strtoupper(substr($_SESSION['username'] ?? 'U', 0, 1));
 ?>
+<script>
+    if (!/app_logged_in=1/.test(document.cookie)) {
+        document.documentElement.style.display = 'none';
+        window.location.replace('<?php echo ($base_path ?? ""); ?>login.php');
+    }
+</script>
 
 <!-- Sidebar Overlay -->
 <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
@@ -131,7 +137,7 @@ $user_initial = strtoupper(substr($_SESSION['username'] ?? 'U', 0, 1));
                 <div class="toast-icon"><svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></div>
                 <div>
                     <p style="font-size: 0.875rem; font-weight: 500; margin: 0;"><?php echo $_SESSION['undo_msg']; ?></p>
-                    <a href="<?php echo $base_path ?? ''; ?>actions/undo_delete.php" class="undo-link">Undo Action</a>
+                    <a href="<?php echo $base_path ?? ''; ?>actions/undo_delete.php?csrf=<?php echo $_SESSION['csrf_token']; ?>" class="undo-link">Undo Action</a>
                 </div>
                 <button onclick="this.parentElement.parentElement.remove()" style="background:transparent; border:none; color:var(--text-muted); cursor:pointer; padding:0.25rem;">
                     <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>

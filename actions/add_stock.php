@@ -5,7 +5,7 @@ require_once '../includes/db_connection.php';
 require_login();
 
 if (($_SESSION['role'] ?? 'user') !== 'admin') {
-    header("Location: index.php");
+    header("Location: ../index.php");
     exit();
 }
 

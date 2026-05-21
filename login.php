@@ -3,8 +3,16 @@ require_once 'auth/security.php';
 require_once 'includes/db_connection.php';
 
 if (isset($_SESSION['user_id'])) {
-    header("Location: index.php");
-    exit();
+    // If a logged-in user returns to the login page, treat it as a logout request.
+    $_SESSION = [];
+    if (isset($_COOKIE[session_name()])) {
+        setcookie(session_name(), '', time() - 3600, '/');
+    }
+    if (isset($_COOKIE['app_logged_in'])) {
+        setcookie('app_logged_in', '', time() - 3600, '/');
+    }
+    session_destroy();
+    session_write_close();
 }
 
 $error = '';
@@ -73,6 +81,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $_SESSION['user_id'] = $user['id'];
             $_SESSION['username'] = $user['username'];
             $_SESSION['role'] = $user['role'] ?? 'user';
+            setcookie('app_logged_in', '1', 0, '/');
             header("Location: index.php");
             exit();
         } else {
