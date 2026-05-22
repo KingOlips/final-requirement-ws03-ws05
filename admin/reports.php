@@ -1,12 +1,11 @@
 <?php
-require_once 'auth/security.php';
-require_once 'auth/auth_check.php';
-require_once 'includes/db_connection.php';
+require_once '../auth/init.php';
+require_once '../includes/db_connection.php';
 require_login();
 
 // Restrict to admins only
 if (($_SESSION['role'] ?? 'user') !== 'admin') {
-    header("Location: index.php");
+    header("Location: ../index.php");
     exit();
 }
 
@@ -42,13 +41,13 @@ try {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Reports & Analytics | PharmTrack</title>
-    <link rel="stylesheet" href="assets/css/style.css">
-    <link rel="icon" type="image/png" href="assets/img/favicon.png">
+    <link rel="stylesheet" href="../assets/css/style.css">
+    <link rel="icon" type="image/png" href="../assets/img/favicon.png">
     <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
 </head>
 <body>
     <div class="app-wrapper">
-        <?php include 'includes/sidebar.php'; ?>
+        <?php include '../includes/sidebar.php'; ?>
 
         <div class="page-body">
             <!-- TOP NAVBAR -->
@@ -63,9 +62,9 @@ try {
                     </div>
                 </div>
                 <div class="topnav-right">
-                    <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Dark Mode" style="background: none; border: none; color: var(--text-main); cursor: pointer; padding: 0.5rem; display: flex; align-items: center; justify-content: center;">
-                        <i id="theme-icon-moon" class='bx bx-moon' style='font-size: 1.5rem;'></i>
-                        <i id="theme-icon-sun" class='bx bx-sun' style='font-size: 1.5rem; display: none;'></i>
+                    <button class="hamburger" onclick="toggleTheme()" title="Toggle Dark Mode">
+                        <svg id="theme-icon-moon" width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
+                        <svg id="theme-icon-sun" width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="display: none;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m12.728 0l-.707-.707M6.343 6.343l-.707-.707M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                     </button>
                     <div class="topnav-avatar">
                         <?php echo strtoupper(substr($_SESSION['username'], 0, 1)); ?>
@@ -149,7 +148,7 @@ try {
             </main>
         </div>
     </div>
-    <script src="assets/js/scripts.js"></script>
+    <script src="../assets/js/scripts.js"></script>
     <script>
         <?php if (isset($_SESSION['success_msg'])): ?>
             showToast('Success', '<?php echo addslashes($_SESSION['success_msg']); ?>', 'success');

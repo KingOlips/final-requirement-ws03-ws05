@@ -57,8 +57,18 @@ function updateThemeIcon(theme) {
 }
 
 // Shopping Cart Functionality
+function setCartBadge(count) {
+    const badge = document.getElementById('cart-badge');
+    if (!badge) return;
+    if (count > 0) {
+        badge.textContent = count;
+        badge.style.display = 'inline-flex';
+    } else {
+        badge.style.display = 'none';
+    }
+}
+
 function addToCart(id, name) {
-    // Send AJAX request to store in database
     const formData = new FormData();
     formData.append('medicine_id', id);
 
@@ -70,6 +80,9 @@ function addToCart(id, name) {
         .then(data => {
             if (data.success) {
                 showToast(name + ' Added!', 'Item saved to your cart.', 'success');
+                if (typeof data.cart_count !== 'undefined') {
+                    setCartBadge(parseInt(data.cart_count, 10));
+                }
             } else {
                 showToast('Error', data.message, 'danger');
             }
@@ -113,6 +126,73 @@ function updateQuantity(id, action, btnEl) {
         }
     })
     .catch(error => {
+        showToast('Error', 'Connection failed to: ' + url, 'danger');
+    });
+}
+
+function removeFromCart(id, el) {
+    const formData = new FormData();
+    formData.append('id', id);
+    formData.append('action', 'remove');
+    formData.append('ajax', '1');
+
+    const url = (window.BASE_URL || '') + 'actions/update_cart.php';
+    fetch(url, {
+        method: 'POST',
+        body: formData
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            // Remove the item card from DOM
+            const card = el.closest('.cart-item-card');
+            if (card) card.remove();
+
+            // Update grand total
+            const grandTotalEl = document.getElementById('grand-total-val');
+            if (grandTotalEl && data.grand_total !== undefined) {
+                grandTotalEl.innerText = '₱' + data.grand_total;
+            }
+
+            // Update cart badge
+            if (typeof data.cart_count !== 'undefined') {
+                setCartBadge(parseInt(data.cart_count, 10));
+                // Update header count text if present
+                const topSub = document.querySelector('.topnav-sub');
+                if (topSub) {
+                    topSub.innerText = (data.cart_count) + ' Medicines selected';
+                }
+
+                // If cart is empty, show empty state
+                if (parseInt(data.cart_count, 10) === 0) {
+                    const cartGrid = document.querySelector('.cart-grid');
+                    if (cartGrid) {
+                        // Replace the entire grid layout with your styled empty container
+                        cartGrid.outerHTML = `
+                        <div class="card" style="text-align: center; padding: 5rem 2rem;">
+                            <div style="width: 80px; height: 80px; background: rgba(79, 70, 229, 0.05); color: var(--primary); border-radius: 2rem; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem;">
+                                <i class='bx bx-shopping-bag' style='font-size: 2.5rem;'></i>
+                            </div>
+                            <h2 style="font-weight: 800; color: var(--text-main); margin-bottom: 0.5rem;">Your cart is empty</h2>
+                            <p style="color: var(--text-muted); margin-bottom: 2rem;">Looks like you haven't added any medicines to your selection yet.</p>
+                            <a href="medicines.php" class="btn btn-primary" style="padding: 1rem 2.5rem;">Browse Medicines</a>
+                        </div>
+                        `;
+                    }
+                    // also update summary totals
+                    const subtotalEl = document.querySelector('.summary-row span[style*="color: var(--text-main)"]');
+                    const grand = document.getElementById('grand-total-val');
+                    if (grand) grand.innerText = '₱0.00';
+                }
+            }
+
+            showToast('Removed', 'Item removed from your cart.', 'success');
+        } else {
+            showToast('Error', data.message || 'Could not remove item.', 'danger');
+        }
+    })
+    .catch(err => {
+        console.error(err);
         showToast('Error', 'Connection failed to: ' + url, 'danger');
     });
 }
@@ -231,21 +311,15 @@ document.addEventListener('DOMContentLoaded', () => {
     initDashboardHistoryLock();
 });
 
-// Prevent going back to the login page from the dashboard and force logout
-function getLogoutUrl() {
-    const path = window.location.pathname;
-    if (path.includes('/product/') || path.includes('/users/') || path.includes('/actions/')) {
-        return '../logout.php';
-    }
-    return 'logout.php';
-}
-
+// Auto-logout when user clicks browser Back button from the dashboard
 function initDashboardHistoryLock() {
     const path = window.location.pathname;
-    if (path.endsWith('index.php') || path === '/' || path.endsWith('/final-requirement-ws03-ws05/') || path.endsWith('/final-requirement-ws03-ws05')) {
-        window.history.pushState(null, null, window.location.href);
-        window.addEventListener('popstate', function () {
-            window.location.replace(getLogoutUrl());
+    if (path.endsWith('index.php') || path === '/' || path.endsWith('/final-requirement-ws03-ws05/')) {
+        // Push a dummy state so the back button triggers popstate first
+        window.history.pushState({ dashboardLock: true }, '', window.location.href);
+        window.addEventListener('popstate', function (e) {
+            // Back button pressed — log the user out immediately
+            window.location.replace('logout.php');
         });
     }
 }

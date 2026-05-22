@@ -70,9 +70,10 @@ $grand_total = $subtotal + $tax;
         }
 
         .cart-item-card:hover {
-            transform: translateY(-4px);
-            border-color: var(--primary);
-            box-shadow: var(--shadow-md);
+            /* Hover effect removed per UX request */
+            transform: none;
+            border-color: inherit;
+            box-shadow: none;
         }
 
         .item-image {
@@ -225,7 +226,7 @@ $grand_total = $subtotal + $tax;
                                                 <div class="qty-val"><?php echo (int)$item['quantity']; ?></div>
                                                 <button onclick="updateQuantity(<?php echo $item['id']; ?>, 'add', this)" class="qty-btn" style="background:none; border:none; padding:0;"><i class='bx bx-plus'></i></button>
                                             </div>
-                                            <a href="cart.php?remove=<?php echo $item['id']; ?>" style="color: var(--danger); font-size: 0.8125rem; font-weight: 600; text-decoration: none; display: flex; align-items: center; gap: 0.25rem;">
+                                            <a href="#" onclick="removeFromCart(<?php echo $item['id']; ?>, this); return false;" style="color: var(--danger); font-size: 0.8125rem; font-weight: 600; text-decoration: none; display: flex; align-items: center; gap: 0.25rem;">
                                                 <i class='bx bx-trash'></i> Remove
                                             </a>
                                         </div>

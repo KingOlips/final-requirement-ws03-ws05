@@ -33,7 +33,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $insert->execute([$user_id, $medicine_id]);
         }
 
-        echo json_encode(['success' => true, 'message' => 'Added to cart successfully']);
+        $countStmt = $pdo->prepare("SELECT SUM(quantity) FROM cart WHERE user_id = ?");
+        $countStmt->execute([$user_id]);
+        $cart_count = (int)$countStmt->fetchColumn();
+
+        echo json_encode(['success' => true, 'message' => 'Added to cart successfully', 'cart_count' => $cart_count]);
     } catch (PDOException $e) {
         echo json_encode(['success' => false, 'message' => 'Error adding to cart: ' . $e->getMessage()]);
     }

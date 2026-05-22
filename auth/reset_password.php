@@ -1,9 +1,9 @@
 <?php
-require_once 'auth/security.php';
-require_once 'includes/db_connection.php';
+require_once 'init.php';
+require_once '../includes/db_connection.php';
 
 if (isset($_SESSION['user_id'])) {
-    header("Location: index.php");
+    header("Location: ../login.php");
     exit();
 }
 
@@ -12,7 +12,7 @@ $success = '';
 $token = $_GET['token'] ?? ($_POST['token'] ?? '');
 
 if (!$token) {
-    header("Location: login.php");
+    header("Location: ../login.php");
     exit();
 }
 
@@ -33,15 +33,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $password = $_POST['password'];
     $confirm_password = $_POST['confirm_password'];
 
-    if (strlen($password) < 6) {
-        $error = "Password must be at least 6 characters long.";
+    $pw_errors = validate_password_strength($password);
+    if (!empty($pw_errors)) {
+        $error = implode(' ', $pw_errors);
     } elseif ($password !== $confirm_password) {
         $error = "Passwords do not match.";
     } else {
         $hashed_password = password_hash($password, PASSWORD_DEFAULT);
-        $stmt = $pdo->prepare("UPDATE users SET password = ?, reset_token = NULL, reset_expiry = NULL WHERE id = ?");
+        $stmt = $pdo->prepare("UPDATE users SET password = ?, reset_token = NULL, reset_expiry = NULL, failed_attempts = 0, locked_until = NULL WHERE id = ?");
         if ($stmt->execute([$hashed_password, $user['id']])) {
-            $success = "Password reset successful! You can now <a href='login.php' style='color:var(--primary); font-weight:700;'>Sign in</a>.";
+            $success = "Password reset successful! You can now <a href='../login.php' style='color:var(--primary); font-weight:700;'>Sign in</a>.";
         } else {
             $error = "Failed to reset password. Please try again.";
         }
@@ -55,8 +56,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Reset Password | PharmTrack</title>
     <script>const savedTheme = localStorage.getItem('theme') || 'light'; document.documentElement.setAttribute('data-theme', savedTheme);</script>
-    <link rel="stylesheet" href="assets/css/style.css">
-    <link rel="icon" type="image/png" href="assets/img/favicon.png">
+    <link rel="stylesheet" href="../assets/css/style.css">
+    <link rel="icon" type="image/png" href="../assets/img/favicon.png">
     <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
     <style>
         body, html { height: 100%; margin: 0; background: var(--background); font-family: 'Inter', sans-serif; transition: background 0.3s; }
@@ -82,7 +83,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 <body>
     <div class="reset-container">
         <div class="reset-card">
-            <a href="login.php" class="auth-logo">
+            <a href="../login.php" class="auth-logo">
                 <div class="auth-logo-icon">
                     <i class='bx bxs-capsule' style='font-size: 1.5rem;'></i>
                 </div>
@@ -92,7 +93,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             <h2 style="font-size: 1.5rem; font-weight: 800; margin-bottom: 0.5rem; text-align: center; color: var(--text-main);">New Password</h2>
             <p style="color: var(--text-muted); font-size: 0.875rem; text-align: center; margin-bottom: 2rem;">Please choose a strong password to protect your account.</p>
 
-            <?php if ($error): ?><div class="alert alert-error"><span><?php echo $error; ?></span></div><?php endif; ?>
+            <?php if ($error): ?><div class="alert alert-error"><span><?php echo e($error); ?></span></div><?php endif; ?>
             <?php if ($success): ?><div class="alert alert-success"><span><?php echo $success; ?></span></div><?php endif; ?>
 
             <?php if (!$success): ?>
@@ -103,8 +104,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 <div class="form-group">
                     <label for="password">New Password</label>
                     <div class="password-container">
-                        <input type="password" name="password" id="password" class="auth-input" required placeholder="Minimum 6 characters" autofocus>
+                        <input type="password" name="password" id="password" class="auth-input" required placeholder="Min 8 chars, upper, lower, number, symbol" autofocus oninput="updateStrengthBar(this.value)">
                         <i class='bx bx-hide password-toggle' onclick="togglePasswordVisibility('password', this)"></i>
+                    </div>
+                    <!-- Password Strength Bar -->
+                    <div style="margin-top:0.4rem;">
+                        <div style="height:5px; background:var(--border); border-radius:99px; overflow:hidden;">
+                            <div id="strengthBar" style="height:100%; width:0%; border-radius:99px; transition:width 0.3s, background 0.3s;"></div>
+                        </div>
+                        <small id="strengthLabel" style="font-size:0.7rem; color:var(--text-muted);"></small>
                     </div>
                 </div>
 
@@ -121,10 +129,34 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             <?php endif; ?>
 
             <div style="margin-top: 1.5rem; text-align: center; font-size: 0.875rem;">
-                <a href="login.php" style="color: var(--text-muted); text-decoration: none; font-weight: 500;">Back to Login</a>
+                <a href="../login.php" style="color: var(--text-muted); text-decoration: none; font-weight: 500;">Back to Login</a>
             </div>
         </div>
     </div>
-    <script src="assets/js/scripts.js"></script>
+    <script src="../assets/js/scripts.js"></script>
+    <script>
+    function updateStrengthBar(val) {
+        let score = 0;
+        if (val.length >= 8) score++;
+        if (/[A-Z]/.test(val)) score++;
+        if (/[a-z]/.test(val)) score++;
+        if (/[0-9]/.test(val)) score++;
+        if (/[\W_]/.test(val)) score++;
+        const bar = document.getElementById('strengthBar');
+        const label = document.getElementById('strengthLabel');
+        const levels = [
+            { pct: '0%',   color: 'transparent', text: '' },
+            { pct: '20%',  color: '#ef4444',     text: 'Very Weak' },
+            { pct: '40%',  color: '#f97316',     text: 'Weak' },
+            { pct: '60%',  color: '#eab308',     text: 'Fair' },
+            { pct: '80%',  color: '#22c55e',     text: 'Strong' },
+            { pct: '100%', color: '#16a34a',     text: 'Very Strong' },
+        ];
+        bar.style.width = levels[score].pct;
+        bar.style.background = levels[score].color;
+        label.textContent = levels[score].text;
+        label.style.color = levels[score].color;
+    }
+    </script>
 </body>
 </html>

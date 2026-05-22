@@ -20,10 +20,36 @@ if ((isset($_GET['id']) || isset($_POST['id'])) && (isset($_GET['action']) || is
     } elseif ($action === 'sub') {
         $stmt = $pdo->prepare("UPDATE cart SET quantity = GREATEST(1, quantity - 1) WHERE id = ? AND user_id = ?");
         $stmt->execute([$cart_id, $user_id]);
+    } elseif ($action === 'remove') {
+        $stmt = $pdo->prepare("DELETE FROM cart WHERE id = ? AND user_id = ?");
+        $stmt->execute([$cart_id, $user_id]);
     }
 
     if ($is_ajax) {
         try {
+            if ($action === 'remove') {
+                // After removal, return new totals and cart count
+                $stmt = $pdo->prepare("SELECT SUM(c.quantity * (SELECT price_per_unit FROM batches WHERE medicine_id = c.medicine_id ORDER BY expiry_date ASC LIMIT 1)) as total 
+                                       FROM cart c 
+                                       WHERE c.user_id = ?");
+                $stmt->execute([$user_id]);
+                $subtotal = $stmt->fetch()['total'] ?: 0;
+                $grand_total = $subtotal * 1.12;
+
+                $countStmt = $pdo->prepare("SELECT SUM(quantity) FROM cart WHERE user_id = ?");
+                $countStmt->execute([$user_id]);
+                $cart_count = (int)$countStmt->fetchColumn();
+
+                header('Content-Type: application/json');
+                echo json_encode([
+                    'success' => true,
+                    'removed' => true,
+                    'grand_total' => number_format($grand_total, 2),
+                    'cart_count' => $cart_count
+                ]);
+                exit();
+            }
+
             // Fetch new state for the item and the whole cart
             $stmt = $pdo->prepare("SELECT c.quantity, 
                                    (SELECT price_per_unit FROM batches WHERE medicine_id = c.medicine_id ORDER BY expiry_date ASC LIMIT 1) as price 
@@ -31,7 +57,7 @@ if ((isset($_GET['id']) || isset($_POST['id'])) && (isset($_GET['action']) || is
                                    WHERE c.id = ?");
             $stmt->execute([$cart_id]);
             $item = $stmt->fetch();
-            
+
             if (!$item) {
                 throw new Exception("Item not found in cart.");
             }
@@ -42,7 +68,7 @@ if ((isset($_GET['id']) || isset($_POST['id'])) && (isset($_GET['action']) || is
             $stmt->execute([$user_id]);
             $subtotal = $stmt->fetch()['total'] ?: 0;
             $grand_total = $subtotal * 1.12; // Adding 12% VAT to match cart.php
-            
+
             header('Content-Type: application/json');
             echo json_encode([
                 'success' => true,

@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/security.php';
+// Session is now handled securely in security.php
 
 function is_logged_in() {
     return isset($_SESSION['user_id']);
@@ -7,10 +7,6 @@ function is_logged_in() {
 
 function require_login() {
     if (!is_logged_in()) {
-        if (isset($_COOKIE['app_logged_in'])) {
-            setcookie('app_logged_in', '', time() - 3600, '/');
-        }
-
         if (file_exists('login.php')) {
             header("Location: login.php");
         } else {
@@ -19,7 +15,14 @@ function require_login() {
         exit();
     } else {
         if (!isset($_COOKIE['app_logged_in'])) {
-            setcookie('app_logged_in', '1', 0, '/');
+            $secure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
+            setcookie('app_logged_in', '1', [
+                'expires' => 0,
+                'path' => '/',
+                'secure' => $secure,
+                'httponly' => true,
+                'samesite' => 'Lax'
+            ]);
         }
     }
 }

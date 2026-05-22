@@ -3,16 +3,8 @@ require_once 'auth/security.php';
 require_once 'includes/db_connection.php';
 
 if (isset($_SESSION['user_id'])) {
-    // If a logged-in user returns to the login page, treat it as a logout request.
-    $_SESSION = [];
-    if (isset($_COOKIE[session_name()])) {
-        setcookie(session_name(), '', time() - 3600, '/');
-    }
-    if (isset($_COOKIE['app_logged_in'])) {
-        setcookie('app_logged_in', '', time() - 3600, '/');
-    }
-    session_destroy();
-    session_write_close();
+    header("Location: index.php");
+    exit();
 }
 
 $error = '';
@@ -40,7 +32,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $stmt = $pdo->prepare("UPDATE users SET reset_token = ?, reset_expiry = DATE_ADD(NOW(), INTERVAL 1 HOUR) WHERE id = ?");
             $stmt->execute([$token, $user_data['id']]);
             
-            $reset_link = "reset_password.php?token=" . $token;
+            $reset_link = "auth/reset_password.php?token=" . $token;
             $success = "A reset link has been generated. <a href='$reset_link' style='color:var(--primary); font-weight:700;'>Click here to reset your password</a> (Simulation).";
         } else {
             $success = "If an account exists for $username, a reset link has been sent.";
@@ -50,14 +42,20 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $username = trim($_POST['username']);
         $password = $_POST['password'];
         $confirm_password = $_POST['confirm_password'];
-        
-        if ($password !== $confirm_password) {
+
+        $pw_errors = validate_password_strength($password);
+        if (!empty($pw_errors)) {
+            $error = implode(' ', $pw_errors);
+            $mode = 'signup';
+        } elseif ($password !== $confirm_password) {
             $error = "Passwords do not match.";
+            $mode = 'signup';
         } else {
             $stmt = $pdo->prepare("SELECT id FROM users WHERE username = ?");
             $stmt->execute([$username]);
             if ($stmt->fetch()) {
                 $error = "Username already exists.";
+                $mode = 'signup';
             } else {
                 $hashed_password = password_hash($password, PASSWORD_DEFAULT);
                 $stmt = $pdo->prepare("INSERT INTO users (username, password) VALUES (?, ?)");
@@ -66,25 +64,59 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     $mode = 'login';
                 } else {
                     $error = "Registration failed. Please try again.";
+                    $mode = 'signup';
                 }
             }
         }
     } else {
+        // ── LOGIN ACTION ──
         $username = trim($_POST['username']);
         $password = $_POST['password'];
+        
         $stmt = $pdo->prepare("SELECT * FROM users WHERE username = ?");
         $stmt->execute([$username]);
         $user = $stmt->fetch();
 
-        if ($user && password_verify($password, $user['password'])) {
-            session_regenerate_id(true);
-            $_SESSION['user_id'] = $user['id'];
-            $_SESSION['username'] = $user['username'];
-            $_SESSION['role'] = $user['role'] ?? 'user';
-            setcookie('app_logged_in', '1', 0, '/');
-            header("Location: index.php");
-            exit();
+        if ($user) {
+            // 1. CRITICAL FIX: Check if the account is currently locked out FIRST.
+            // If it is locked, reject immediately without validating password or adding more errors.
+            if ($user['locked_until'] && strtotime($user['locked_until']) > time()) {
+                $mins = ceil((strtotime($user['locked_until']) - time()) / 60);
+                $error = "Account is temporarily locked due to multiple failed attempts. Please try again in {$mins} minute(s).";
+            } 
+            // 2. Account is NOT locked, check if password is correct
+            elseif (password_verify($password, $user['password'])) {
+                // Successful login – reset counters completely
+                $pdo->prepare("UPDATE users SET failed_attempts = 0, locked_until = NULL WHERE id = ?")
+                    ->execute([$user['id']]);
+                
+                session_regenerate_id(true);
+                $_SESSION['user_id'] = $user['id'];
+                $_SESSION['username'] = $user['username'];
+                $_SESSION['role'] = $user['role'] ?? 'user';
+                setcookie('app_logged_in', '1', 0, '/');
+                header("Location: index.php");
+                exit();
+            } 
+            // 3. Password is wrong (and account wasn't already locked)
+            else {
+                $attempts = $user['failed_attempts'] + 1;
+                
+                if ($attempts >= 5) {
+                    // Lock the account for exactly 15 minutes from right now
+                    $pdo->prepare("UPDATE users SET failed_attempts = ?, locked_until = DATE_ADD(NOW(), INTERVAL 15 MINUTE) WHERE id = ?")
+                        ->execute([$attempts, $user['id']]);
+                    $error = "Too many failed attempts. Your account has been locked for 15 minutes.";
+                } else {
+                    // Record the failed attempt normally
+                    $remaining = 5 - $attempts;
+                    $pdo->prepare("UPDATE users SET failed_attempts = ? WHERE id = ?")
+                        ->execute([$attempts, $user['id']]);
+                    $error = "Invalid username or password. {$remaining} attempt(s) remaining before lockout.";
+                }
+            }
         } else {
+            // Username doesn't exist at all
             $error = "Invalid username or password.";
         }
     }
@@ -174,8 +206,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         <div class="form-group">
                             <label for="password">Password</label>
                             <div class="password-container">
-                                <input type="password" name="password" id="password" class="auth-input" required placeholder="Put your password" style="width: 100%; box-sizing: border-box; padding-right: 2.75rem;">
+                                <input type="password" name="password" id="password" class="auth-input" required placeholder="Min 8 chars, upper, lower, number, symbol" style="width: 100%; box-sizing: border-box; padding-right: 2.75rem;" oninput="updateStrengthBar(this.value)">
                                 <i class='bx bx-hide password-toggle' onclick="togglePasswordVisibility('password', this)"></i>
+                            </div>
+                            <!-- Password Strength Bar -->
+                            <div style="margin-top: -0.5rem; margin-bottom: 0.75rem;">
+                                <div style="height:5px; background:var(--border); border-radius:99px; overflow:hidden;">
+                                    <div id="strengthBar" style="height:100%; width:0%; border-radius:99px; transition:width 0.3s, background 0.3s;"></div>
+                                </div>
+                                <small id="strengthLabel" style="font-size:0.7rem; color:var(--text-muted);"></small>
                             </div>
                         </div>
                         <div class="form-group">
@@ -188,6 +227,30 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         <button type="submit" class="btn btn-primary auth-btn">Create account</button>
                     </form>
                     <div class="auth-toggle-link">Already have an account? <a href="?mode=login">Sign in here</a></div>
+                    <script>
+                    function updateStrengthBar(val) {
+                        let score = 0;
+                        if (val.length >= 8) score++;
+                        if (/[A-Z]/.test(val)) score++;
+                        if (/[a-z]/.test(val)) score++;
+                        if (/[0-9]/.test(val)) score++;
+                        if (/[\W_]/.test(val)) score++;
+                        const bar = document.getElementById('strengthBar');
+                        const label = document.getElementById('strengthLabel');
+                        const levels = [
+                            { pct: '0%',   color: 'transparent', text: '' },
+                            { pct: '20%',  color: '#ef4444',     text: 'Very Weak' },
+                            { pct: '40%',  color: '#f97316',     text: 'Weak' },
+                            { pct: '60%',  color: '#eab308',     text: 'Fair' },
+                            { pct: '80%',  color: '#22c55e',     text: 'Strong' },
+                            { pct: '100%', color: '#16a34a',     text: 'Very Strong' },
+                        ];
+                        bar.style.width = levels[score].pct;
+                        bar.style.background = levels[score].color;
+                        label.textContent = levels[score].text;
+                        label.style.color = levels[score].color;
+                    }
+                    </script>
 
                 <?php else: ?>
                     <h2 class="auth-title">Sign in</h2>

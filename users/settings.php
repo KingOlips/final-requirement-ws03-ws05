@@ -1,8 +1,8 @@
 <?php
 $base_path = '';
-require_once 'auth/security.php';
-require_once 'auth/auth_check.php';
-require_once 'includes/db_connection.php';
+require_once '../auth/security.php';
+require_once '../auth/auth_check.php';
+require_once '../includes/db_connection.php';
 require_login();
 
 $success = '';
@@ -19,14 +19,25 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
     try {
         if (!empty($new_password)) {
-            if ($new_password !== $confirm_password) {
-                $error = "New passwords do not match.";
+            $pw_errors = validate_password_strength($new_password);
+            if (!empty($pw_errors)) {
+                $error = implode(' ', $pw_errors);
             } else {
-                $hashed = password_hash($new_password, PASSWORD_DEFAULT);
-                $stmt = $pdo->prepare("UPDATE users SET username = ?, password = ? WHERE id = ?");
-                $stmt->execute([$new_username, $hashed, $_SESSION['user_id']]);
-                $_SESSION['username'] = $new_username;
-                $success = "Profile and password updated successfully!";
+                $stmt = $pdo->prepare("SELECT password FROM users WHERE id = ?");
+                $stmt->execute([$_SESSION['user_id']]);
+                $current_password_hash = $stmt->fetchColumn();
+
+                if ($current_password_hash && password_verify($new_password, $current_password_hash)) {
+                    $error = "New password must be different from your current password.";
+                } elseif ($new_password !== $confirm_password) {
+                    $error = "New passwords do not match.";
+                } else {
+                    $hashed = password_hash($new_password, PASSWORD_DEFAULT);
+                    $stmt = $pdo->prepare("UPDATE users SET username = ?, password = ? WHERE id = ?");
+                    $stmt->execute([$new_username, $hashed, $_SESSION['user_id']]);
+                    $_SESSION['username'] = $new_username;
+                    $success = "Profile and password updated successfully!";
+                }
             }
         } else {
             $stmt = $pdo->prepare("UPDATE users SET username = ? WHERE id = ?");
@@ -45,16 +56,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Settings | PharmTrack</title>
-    <link rel="stylesheet" href="assets/css/style.css">
-    <link rel="icon" type="image/png" href="assets/img/favicon.png">
+    <link rel="stylesheet" href="../assets/css/style.css">
+    <link rel="icon" type="image/png" href="../assets/img/favicon.png">
     <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
-    <link rel="stylesheet" href="assets/css/settings.css">
+    <link rel="stylesheet" href="../assets/css/settings.css">
 </head>
 <body>
     <div class="app-wrapper">
         <?php
 $base_path = '';
-include 'includes/sidebar.php'; ?>
+include '../includes/sidebar.php'; ?>
 
         <div class="page-body">
             <!-- TOP NAVBAR -->
@@ -148,8 +159,14 @@ echo e($_SESSION['username']); ?>" required style="background: var(--background)
                                     <div class="form-group">
                                         <label for="new_password" style="font-weight: 600; color: var(--text-main);">New Password</label>
                                         <div class="password-container">
-                                            <input type="password" name="new_password" id="new_password" placeholder="Put your New Password" style="background: var(--background); border: 1px solid var(--border); width: 100%; box-sizing: border-box; padding-right: 2.75rem;">
+                                            <input type="password" name="new_password" id="new_password" placeholder="Put your New Password" style="background: var(--background); border: 1px solid var(--border); width: 100%; box-sizing: border-box; padding-right: 2.75rem;" oninput="updateStrengthBar(this.value)">
                                             <i class='bx bx-hide password-toggle' onclick="togglePasswordVisibility('new_password', this)"></i>
+                                        </div>
+                                        <div style="margin-top:0.75rem;">
+                                            <div style="height:5px; background:var(--border); border-radius:99px; overflow:hidden;">
+                                                <div id="strengthBar" style="height:100%; width:0%; border-radius:99px; transition:width 0.3s, background 0.3s;"></div>
+                                            </div>
+                                            <small id="strengthLabel" style="font-size:0.7rem; color:var(--text-muted);"></small>
                                         </div>
                                     </div>
                                     <div class="form-group">
@@ -164,7 +181,7 @@ echo e($_SESSION['username']); ?>" required style="background: var(--background)
                             </div>
 
                             <div style="margin-top: 3rem; display: flex; justify-content: flex-end; gap: 1rem;">
-                                <a href="index.php" class="btn" style="background: var(--background); color: var(--text-main); font-weight: 500;">Cancel</a>
+                                <a href="../index.php" class="btn" style="background: var(--background); color: var(--text-main); font-weight: 500;">Cancel</a>
                                 <button type="submit" class="btn btn-primary" style="padding-left: 2.5rem; padding-right: 2.5rem; box-shadow: 0 10px 15px -3px rgba(79, 70, 229, 0.3);">Save Changes</button>
                             </div>
                         </form>
@@ -183,7 +200,7 @@ if ($user_role !== 'admin'): ?>
                                     <p style="font-size: 0.8125rem; color: var(--text-muted); margin-bottom: 1rem; line-height: 1.4;">
                                         This will permanently remove your profile and all selection history. This action is irreversible.
                                     </p>
-                                    <a href="users/users.php?delete=<?php echo $_SESSION['user_id']; ?>&csrf=<?php echo $_SESSION['csrf_token']; ?>" 
+                                    <a href="users.php?delete=<?php echo $_SESSION['user_id']; ?>&csrf=<?php echo $_SESSION['csrf_token']; ?>" 
                                        class="btn btn-danger" 
                                        style="background: var(--danger); color: white; padding: 0.6rem 1.25rem; font-size: 0.8125rem; font-weight: 600;"
                                        onclick="return confirm('PERMANENT DELETION: Are you absolutely sure?')">
@@ -200,6 +217,33 @@ endif; ?>
             </main>
         </div>
     </div>
-    <script src="assets/js/scripts.js"></script>
-</body>
-</html>
+    <script src="../assets/js/scripts.js"></script>
+    <script>
+    function updateStrengthBar(val) {
+        let score = 0;
+        if (val.length >= 8) score++;
+        if (/[A-Z]/.test(val)) score++;
+        if (/[a-z]/.test(val)) score++;
+        if (/[0-9]/.test(val)) score++;
+        if (/[^A-Za-z0-9]/.test(val)) score++;
+        const bar = document.getElementById('strengthBar');
+        const label = document.getElementById('strengthLabel');
+        const levels = [
+            { pct: '0%',   color: 'transparent', text: '' },
+            { pct: '20%',  color: '#ef4444',     text: 'Very Weak' },
+            { pct: '40%',  color: '#f97316',     text: 'Weak' },
+            { pct: '60%',  color: '#eab308',     text: 'Fair' },
+            { pct: '80%',  color: '#22c55e',     text: 'Strong' },
+            { pct: '100%', color: '#16a34a',     text: 'Very Strong' },
+        ];
+        const level = levels[score];
+        if (bar) {
+            bar.style.width = level.pct;
+            bar.style.background = level.color;
+        }
+        if (label) {
+            label.textContent = level.text;
+            label.style.color = level.color;
+        }
+    }
+    </script>

@@ -37,6 +37,12 @@
     --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.5);
 }
 
+.reports-container {
+    background-color: var(--card-bg); /* Use variable, don't hardcode #fff */
+    border: 1px solid var(--border);  /* Use variable, don't hardcode gray */
+    color: var(--text-main);
+}
+
 * {
     margin: 0;
     padding: 0;

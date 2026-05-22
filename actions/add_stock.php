@@ -1,6 +1,5 @@
 <?php
-require_once '../auth/security.php';
-require_once '../auth/auth_check.php';
+require_once '../auth/init.php';
 require_once '../includes/db_connection.php';
 require_login();
 

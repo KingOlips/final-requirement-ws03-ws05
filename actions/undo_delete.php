@@ -1,11 +1,17 @@
 <?php
-require_once '../auth/security.php';
-require_once '../auth/auth_check.php';
+require_once '../auth/init.php';
 require_once '../includes/db_connection.php';
 require_login();
 
-if (!isset($_GET['csrf']) || !verify_csrf_token($_GET['csrf'])) {
-    die("Security violation: CSRF token mismatch.");
+// Accept POST or GET for undo endpoint (POST preferred)
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!isset($_POST['csrf_token']) || !verify_csrf_token($_POST['csrf_token'])) {
+        die("Security violation: CSRF token mismatch.");
+    }
+} else {
+    if (!isset($_GET['csrf']) || !verify_csrf_token($_GET['csrf'])) {
+        die("Security violation: CSRF token mismatch.");
+    }
 }
 
 if (isset($_SESSION['last_deleted_batch'])) {
